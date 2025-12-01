@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapka - Найди кружок для ребёнка</title>
   <meta name="description" content="Поиск детских кружков и секций на карте">
+  <!-- Подключаем Яндекс Карты API v3 -->
+  <script src="https://api-maps.yandex.ru/v3/?apikey=58c38b72-57f7-4946-bc13-a256d341281a&lang=ru_RU"></script>
   <script src="map.js" defer></script>
   <style>
     * {
@@ -177,10 +179,12 @@
       position: absolute;
       inset: 0;
       background: #e5e5e5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #888;
+    }
+
+    /* Стили для контейнера карты */
+    #map {
+      width: 100%;
+      height: 100%;
     }
 
     .left-panel {
@@ -272,6 +276,15 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+
+    /* Добавляем класс sectionCard для совместимости с map.js */
+    .sectionCard {
+      transition: box-shadow 0.3s;
+    }
+
+    .sectionCard.highlight-temp {
+      box-shadow: 0 0 0 3px #69AFDF;
     }
 
     .card-top {
@@ -410,17 +423,19 @@
       display: block;
     }
 
+    /* Стили для мобильной карты */
     .mobile-map {
       position: fixed;
       inset: 0;
       top: 56px;
       z-index: 0;
       background: #e5e5e5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #888;
       transition: height 0.3s;
+    }
+
+    #mobileMap {
+      width: 100%;
+      height: 100%;
     }
 
     /* Bottom Sheet */
@@ -670,10 +685,9 @@
 
   <!-- Desktop Layout -->
   <main class="main-desktop">
-    <div class="map-container" id="map">
-      <div id="map">   
-      </div>
-      </div>
+    <!-- Исправлена структура карты - убран дублирующий id -->
+    <div class="map-container">
+      <div id="map"></div>
     </div>
 
     <div class="left-panel">
@@ -698,7 +712,9 @@
 
   <!-- Mobile Layout -->
   <main class="main-mobile">
-    <div class="mobile-map" id="map">
+    <!-- Мобильная карта с уникальным id -->
+    <div class="mobile-map">
+      <div id="mobileMap"></div>
     </div>
 
     <div class="bottom-sheet split" id="bottomSheet">
@@ -748,10 +764,9 @@
       }
     ];
 
-    // Generate card HTML
     function createCardHTML(club) {
       return `
-        <div class="club-card">
+        <div class="club-card sectionCard">
           <div class="card-top">
             <div class="card-image">
               <img src="${club.image}" alt="${club.name}">
@@ -775,7 +790,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
               </svg>
-              <span>${club.location}</span>
+              <span class="cardLocationText">${club.location}</span>
             </div>
             <div class="card-buttons">
               <a href="club.html?slug=${club.slug}" class="card-btn">Подробнее</a>
@@ -790,7 +805,7 @@
     document.getElementById('desktopCards').innerHTML = clubs.map(createCardHTML).join('');
     document.getElementById('mobileCards').innerHTML = clubs.map(createCardHTML).join('');
 
-    // Mobile menu
+    // Mobile menu toggle
     const menuBtn = document.getElementById('menuBtn');
     const closeMenuBtn = document.getElementById('closeMenuBtn');
     const menuOverlay = document.getElementById('menuOverlay');
@@ -810,88 +825,48 @@
     closeMenuBtn.addEventListener('click', closeMenu);
     menuOverlay.addEventListener('click', closeMenu);
 
-    // Bottom sheet
+    // Bottom sheet drag
     const bottomSheet = document.getElementById('bottomSheet');
     const sheetHandle = document.getElementById('sheetHandle');
-    const mobileMap = document.getElementById('mobileMap');
-    let sheetState = 'split';
-    let isDragging = false;
+    const states = ['peek', 'split', 'full'];
+    let currentState = 1;
+
     let startY = 0;
-    let startTranslateY = 0;
-
-    function getTranslateY(state) {
-      const vh = window.innerHeight;
-      switch(state) {
-        case 'peek': return vh - 56 - 84;
-        case 'split': return (vh - 56) / 2;
-        case 'full': return 0;
-        default: return (vh - 56) / 2;
-      }
-    }
-
-    function updateMapHeight() {
-      const vh = window.innerHeight;
-      switch(sheetState) {
-        case 'peek':
-          mobileMap.style.height = `calc(100vh - 84px - 56px)`;
-          break;
-        case 'split':
-          mobileMap.style.height = `calc(50vh - 56px)`;
-          break;
-        case 'full':
-          mobileMap.style.height = '40vh';
-          break;
-      }
-    }
-
-    function setSheetState(state) {
-      sheetState = state;
-      bottomSheet.className = 'bottom-sheet ' + state;
-      updateMapHeight();
-    }
-
-    sheetHandle.addEventListener('click', () => {
-      if (sheetState === 'peek') setSheetState('split');
-      else if (sheetState === 'split') setSheetState('full');
-      else setSheetState('peek');
-    });
+    let isDragging = false;
 
     sheetHandle.addEventListener('touchstart', (e) => {
-      isDragging = true;
       startY = e.touches[0].clientY;
-      bottomSheet.style.transition = 'none';
+      isDragging = true;
     });
 
     document.addEventListener('touchmove', (e) => {
       if (!isDragging) return;
       const deltaY = e.touches[0].clientY - startY;
-      
-      if (deltaY > 50) {
-        if (sheetState === 'full') setSheetState('split');
-        else if (sheetState === 'split') setSheetState('peek');
-        isDragging = false;
-      } else if (deltaY < -50) {
-        if (sheetState === 'peek') setSheetState('split');
-        else if (sheetState === 'split') setSheetState('full');
+      if (Math.abs(deltaY) > 50) {
+        if (deltaY > 0 && currentState > 0) {
+          currentState--;
+        } else if (deltaY < 0 && currentState < 2) {
+          currentState++;
+        }
+        bottomSheet.className = `bottom-sheet ${states[currentState]}`;
         isDragging = false;
       }
     });
 
     document.addEventListener('touchend', () => {
       isDragging = false;
-      bottomSheet.style.transition = '';
     });
 
     // Favorite toggle
     document.addEventListener('click', (e) => {
-      if (e.target.closest('.favorite-btn')) {
-        const btn = e.target.closest('.favorite-btn');
+      const btn = e.target.closest('.favorite-btn');
+      if (btn) {
         btn.classList.toggle('active');
+        const id = btn.dataset.id;
+        const club = clubs.find(c => c.id == id);
+        if (club) club.isFavorite = !club.isFavorite;
       }
     });
-
-    // Initial setup
-    updateMapHeight();
   </script>
 </body>
 </html>
