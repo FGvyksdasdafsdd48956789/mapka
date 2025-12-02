@@ -64,49 +64,69 @@
   }
 
   function createMarkerElement(title = "", rawAddress = "") {
+    // Внешний контейнер с фиксированными размерами для правильной привязки
+    const container = document.createElement("div")
+    container.style.cssText = `
+      position: relative;
+      width: 0;
+      height: 0;
+    `
+
+    // Внутренний элемент метки, позиционируется относительно точки координат
     const el = document.createElement("div")
     el.className = "custom-marker"
-    // Центрируем метку относительно координат (снизу по центру точки)
-    el.style.transform = "translate(-50%, -100%)"
-    el.style.pointerEvents = "auto"
-    el.style.cursor = "pointer"
+    el.style.cssText = `
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      pointer-events: auto;
+      cursor: pointer;
+    `
     el.setAttribute("data-address", normalizeAddress(rawAddress))
 
     const wrapper = document.createElement("div")
-    wrapper.style.display = "flex"
-    wrapper.style.flexDirection = "column"
-    wrapper.style.alignItems = "center"
+    wrapper.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    `
 
     // Подпись
     const lbl = document.createElement("div")
     lbl.className = "custom-marker-label"
     lbl.textContent = title || rawAddress || ""
-    lbl.style.fontSize = "12px"
-    lbl.style.fontWeight = "500"
-    lbl.style.color = "#111"
-    lbl.style.background = "rgba(255,255,255,0.95)"
-    lbl.style.padding = "4px 10px"
-    lbl.style.borderRadius = "10px"
-    lbl.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)"
-    lbl.style.whiteSpace = "nowrap"
-    lbl.style.marginBottom = "6px"
-    lbl.style.pointerEvents = "none"
+    lbl.style.cssText = `
+      font-size: 12px;
+      font-weight: 500;
+      color: #111;
+      background: rgba(255,255,255,0.95);
+      padding: 4px 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      white-space: nowrap;
+      margin-bottom: 6px;
+      pointer-events: none;
+    `
 
     // Точка
     const dot = document.createElement("div")
     dot.className = "custom-marker-dot"
-    dot.style.width = "18px"
-    dot.style.height = "18px"
-    dot.style.borderRadius = "50%"
-    dot.style.background = "#e74c3c"
-    dot.style.boxShadow = "0 2px 6px rgba(0,0,0,0.35)"
-    dot.style.border = "3px solid white"
+    dot.style.cssText = `
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e74c3c;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      border: 3px solid white;
+    `
 
     wrapper.appendChild(lbl)
     wrapper.appendChild(dot)
     el.appendChild(wrapper)
+    container.appendChild(el)
 
-    return el
+    return container
   }
 
   function addMarkerToMap(coords, title = "", rawAddress = "") {
@@ -116,8 +136,9 @@
       map.addChild(marker)
 
       // Клик по метке -> скролл к карточке
-      const elToMatch = markerElement.getAttribute("data-address")
-      markerElement.addEventListener("click", () => {
+      const innerEl = markerElement.querySelector(".custom-marker")
+      const elToMatch = innerEl?.getAttribute("data-address")
+      innerEl?.addEventListener("click", () => {
         if (!elToMatch) return
         const all = Array.from(document.querySelectorAll(".cardLocationText"))
         const target = all.find((x) => normalizeAddress(x.textContent) === elToMatch)
