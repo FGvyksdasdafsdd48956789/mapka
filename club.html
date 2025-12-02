@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapka - Страница кружка</title>
-  <script src="map.js" defer></script>
+  <!-- Подключаем Яндекс.Карты API -->
+  <script src="https://api-maps.yandex.ru/v3/?apikey=58c38b72-57f7-4946-bc13-a256d341281a&lang=ru_RU"></script>
   <style>
     * {
       margin: 0;
@@ -393,23 +394,42 @@
       background: #f0f0f0;
     }
 
-    /* Map placeholder */
-    .map-placeholder {
+    /* Map container - убрали placeholder стили, добавили реальные стили для карты */
+    .map-container {
       background: white;
       border-radius: 12px;
-      height: 192px;
+      height: 256px;
+      overflow: hidden;
+    }
+
+    /* Стили для меток на карте клуба */
+    .club-marker {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      color: #666;
+      /* Центрируем метку относительно координат (снизу по центру) */
+      transform: translate(-50%, -100%);
     }
 
-    .map-placeholder svg {
-      width: 48px;
-      height: 48px;
-      color: #69AFDF;
-      margin-bottom: 8px;
+    .club-marker-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #111;
+      background: rgba(255,255,255,0.95);
+      padding: 6px 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      white-space: nowrap;
+      margin-bottom: 6px;
+    }
+
+    .club-marker-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #69AFDF;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      border: 3px solid white;
     }
 
     /* Fixed bottom actions */
@@ -596,8 +616,8 @@
         grid-template-columns: repeat(3, 1fr);
       }
 
-      .map-placeholder {
-        height: 256px;
+      .map-container {
+        height: 320px;
       }
     }
   </style>
@@ -922,9 +942,8 @@
               </svg>
               На карте
             </h2>
-            <div class="map-placeholder" id="map">
-              
-            </div>
+            <!-- Заменили placeholder на реальный контейнер карты -->
+            <div class="map-container" id="clubMap"></div>
           </div>
         </div>
       `;
@@ -932,6 +951,85 @@
       // Setup event listeners
       setupGalleryListeners();
       setupPhoneListener();
+      
+      initClubMap(club.address, club.title);
+    }
+
+    async function initClubMap(address, title) {
+      const ymaps3 = window.ymaps3;
+      if (!ymaps3) {
+        console.error('ymaps3 не загружен');
+        return;
+      }
+
+      try {
+        await ymaps3.ready;
+      } catch (e) {
+        console.error('ymaps3.ready failed', e);
+        return;
+      }
+
+      const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer, YMapMarker } = ymaps3;
+      const GEOCODE_API_KEY = '58c38b72-57f7-4946-bc13-a256d341281a';
+
+      // Геокодируем адрес клуба
+      const coords = await geocodeAddress(address, GEOCODE_API_KEY);
+      if (!coords) {
+        console.warn('Не удалось получить координаты для:', address);
+        return;
+      }
+
+      const mapContainer = document.getElementById('clubMap');
+      if (!mapContainer) {
+        console.error('Контейнер карты не найден');
+        return;
+      }
+
+      // Создаём карту с центром на координатах клуба
+      const map = new YMap(mapContainer, { 
+        location: { center: coords, zoom: 16 } 
+      });
+      map.addChild(new YMapDefaultSchemeLayer());
+      map.addChild(new YMapDefaultFeaturesLayer());
+
+      // Создаём метку
+      const markerElement = document.createElement('div');
+      markerElement.className = 'club-marker';
+      
+      const label = document.createElement('div');
+      label.className = 'club-marker-label';
+      label.textContent = title;
+      
+      const dot = document.createElement('div');
+      dot.className = 'club-marker-dot';
+      
+      markerElement.appendChild(label);
+      markerElement.appendChild(dot);
+
+      const marker = new YMapMarker({ coordinates: coords }, markerElement);
+      map.addChild(marker);
+    }
+
+    async function geocodeAddress(address, apiKey) {
+      if (!address) return null;
+      const url = `https://geocode-maps.yandex.ru/1.x/?format=json&geocode=${encodeURIComponent(address)}&apikey=${apiKey}&results=1`;
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return null;
+        const json = await r.json();
+        const fm = json?.response?.GeoObjectCollection?.featureMember;
+        if (Array.isArray(fm) && fm.length) {
+          const pos = fm[0].GeoObject?.Point?.pos;
+          if (pos) {
+            const [lng, lat] = pos.split(' ').map(Number);
+            if (!Number.isNaN(lng) && !Number.isNaN(lat)) return [lng, lat];
+          }
+        }
+        return null;
+      } catch (err) {
+        console.error('Geocode failed', err);
+        return null;
+      }
     }
 
     function setupGalleryListeners() {

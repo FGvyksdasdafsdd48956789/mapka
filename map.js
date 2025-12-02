@@ -1,6 +1,6 @@
-// js/map.js — обновлённый: метки с видимыми подписями и кликом
+// map.js — исправленные метки, которые не съезжают при зуме
 ;(async function initMap() {
-  const ymaps3 = window.ymaps3 // Declare the ymaps3 variable
+  const ymaps3 = window.ymaps3
   if (!ymaps3) {
     console.error("ymaps3 is not available")
     return
@@ -15,7 +15,7 @@
 
   const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer, YMapMarker } = ymaps3
 
-  const rostovLocation = { center: [39.711515, 47.236171], zoom: 12 } // [lng, lat]
+  const rostovLocation = { center: [39.711515, 47.236171], zoom: 12 }
 
   const mapContainer = window.innerWidth >= 768 ? document.getElementById("map") : document.getElementById("mobileMap")
 
@@ -55,7 +55,6 @@
     }
   }
 
-  // Нормализует строку адреса для точного поиска карточки (убираем лишние пробелы и "г.")
   function normalizeAddress(str) {
     return (str || "")
       .replace(/^г\.\s*/i, "")
@@ -64,50 +63,47 @@
       .toLowerCase()
   }
 
-  // Создаём DOM-метку: точка + подпись
   function createMarkerElement(title = "", rawAddress = "") {
     const el = document.createElement("div")
     el.className = "custom-marker"
-    el.style.position = "relative"
+    // Центрируем метку относительно координат (снизу по центру точки)
+    el.style.transform = "translate(-50%, -100%)"
     el.style.pointerEvents = "auto"
+    el.style.cursor = "pointer"
     el.setAttribute("data-address", normalizeAddress(rawAddress))
 
-    // точка (иконка)
+    const wrapper = document.createElement("div")
+    wrapper.style.display = "flex"
+    wrapper.style.flexDirection = "column"
+    wrapper.style.alignItems = "center"
+
+    // Подпись
+    const lbl = document.createElement("div")
+    lbl.className = "custom-marker-label"
+    lbl.textContent = title || rawAddress || ""
+    lbl.style.fontSize = "12px"
+    lbl.style.fontWeight = "500"
+    lbl.style.color = "#111"
+    lbl.style.background = "rgba(255,255,255,0.95)"
+    lbl.style.padding = "4px 10px"
+    lbl.style.borderRadius = "10px"
+    lbl.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)"
+    lbl.style.whiteSpace = "nowrap"
+    lbl.style.marginBottom = "6px"
+    lbl.style.pointerEvents = "none"
+
+    // Точка
     const dot = document.createElement("div")
     dot.className = "custom-marker-dot"
     dot.style.width = "18px"
     dot.style.height = "18px"
     dot.style.borderRadius = "50%"
     dot.style.background = "#e74c3c"
-    dot.style.boxShadow = "0 1px 4px rgba(0,0,0,0.35)"
-    dot.style.transform = "translateY(0)"
-    dot.style.zIndex = "2"
+    dot.style.boxShadow = "0 2px 6px rgba(0,0,0,0.35)"
+    dot.style.border = "3px solid white"
 
-    // подпись
-    const lbl = document.createElement("div")
-    lbl.className = "custom-marker-label"
-    lbl.textContent = title || rawAddress || ""
-    // базовые inline-стили — но лучше ещё добавить CSS ниже
-    lbl.style.fontSize = "12px"
-    lbl.style.color = "#111"
-    lbl.style.background = "rgba(255,255,255,0.95)"
-    lbl.style.padding = "4px 8px"
-    lbl.style.borderRadius = "10px"
-    lbl.style.boxShadow = "0 1px 3px rgba(0,0,0,0.15)"
-    lbl.style.whiteSpace = "nowrap"
-    lbl.style.marginBottom = "6px"
-    lbl.style.transform = "translateY(-6px)"
-    lbl.style.zIndex = "3"
-    lbl.style.pointerEvents = "none" // чтобы клики шли на контейнер метки
-
-    // упакуем: сначала подпись (над точкой), потом точка
-    const wrapper = document.createElement("div")
-    wrapper.style.display = "flex"
-    wrapper.style.flexDirection = "column"
-    wrapper.style.alignItems = "center"
     wrapper.appendChild(lbl)
     wrapper.appendChild(dot)
-
     el.appendChild(wrapper)
 
     return el
@@ -119,26 +115,21 @@
       const marker = new YMapMarker({ coordinates: coords }, markerElement)
       map.addChild(marker)
 
-      // клик по метке -> найти карточку с таким адресом и скроллить к ней
-      try {
-        const elToMatch = markerElement.getAttribute("data-address")
-        markerElement.addEventListener("click", () => {
-          if (!elToMatch) return
-          const all = Array.from(document.querySelectorAll(".cardLocationText"))
-          const target = all.find((x) => normalizeAddress(x.textContent) === elToMatch)
-          if (target) {
-            target.closest(".sectionCard")?.scrollIntoView({ behavior: "smooth", block: "center" })
-            // можно также выделить карточку визуально
-            const card = target.closest(".sectionCard")
-            if (card) {
-              card.classList.add("highlight-temp")
-              setTimeout(() => card.classList.remove("highlight-temp"), 2000)
-            }
+      // Клик по метке -> скролл к карточке
+      const elToMatch = markerElement.getAttribute("data-address")
+      markerElement.addEventListener("click", () => {
+        if (!elToMatch) return
+        const all = Array.from(document.querySelectorAll(".cardLocationText"))
+        const target = all.find((x) => normalizeAddress(x.textContent) === elToMatch)
+        if (target) {
+          target.closest(".sectionCard")?.scrollIntoView({ behavior: "smooth", block: "center" })
+          const card = target.closest(".sectionCard")
+          if (card) {
+            card.classList.add("highlight-temp")
+            setTimeout(() => card.classList.remove("highlight-temp"), 2000)
           }
-        })
-      } catch (e) {
-        console.warn("Не удалось повесить клик на метку", e)
-      }
+        }
+      })
 
       return marker
     } catch (err) {
@@ -152,21 +143,16 @@
     console.warn("Не найдено .cardLocationText")
     return
   }
-  console.log("Найдено адресов:", els.length)
 
   const added = []
   for (const el of els) {
     const raw = el.textContent.trim()
     const address = raw.replace(/^г\.\s*/i, "").trim()
     const title = el.closest(".sectionCard")?.querySelector("h2")?.textContent?.trim() || ""
-    console.log("Геокодим:", raw, "=>", address)
     const coords = await geocodeAddress(address)
     if (coords) {
-      console.log("Координаты:", coords)
       addMarkerToMap(coords, title, address)
       added.push(coords)
-    } else {
-      console.warn("Координаты не найдены для", address)
     }
     await new Promise((r) => setTimeout(r, 200))
   }
@@ -175,13 +161,9 @@
     try {
       if (typeof map.setLocation === "function") {
         map.setLocation({ center: added[0], zoom: 13 })
-      } else {
-        console.log("map.setLocation недоступен — оставляем исходный центр")
       }
     } catch (e) {
       console.warn("Не удалось центрировать карту", e)
     }
-  } else {
-    console.log("Маркеры не добавлены — оставляем исходный центр")
   }
 })()
