@@ -738,7 +738,7 @@
       font-size: 14px;
       padding: 8px 16px;
       border-radius: 24px;
-      border: none;
+      border: 1px solid #1a1a1a;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -746,11 +746,13 @@
     .filter-tag:hover {
       background: #69AFDF;
       color: white;
+      border-color: #69AFDF;
     }
 
     .filter-tag.active {
       background: #69AFDF;
       color: white;
+      border-color: #69AFDF;
     }
 
     .tags-expand-btn {
@@ -1208,13 +1210,12 @@
 
       <div class="active-filters" id="desktopActiveFilters"></div>
 
-      <!-- added desktop panel handle for collapsing -->
+      <div class="desktop-panel-handle" id="desktopPanelHandle">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+        </svg>
+      </div>
       <div class="cards-container">
-        <div class="desktop-panel-handle" id="desktopPanelHandle">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
-        </div>
         <div class="cards-list" id="desktopCards"></div>
       </div>
     </div>
@@ -1752,6 +1753,7 @@
     document.addEventListener('mouseup', () => {
       isDesktopDragging = false;
     });
+
   </script>
 </body>
 </html>
