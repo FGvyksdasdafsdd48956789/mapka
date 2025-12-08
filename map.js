@@ -1,4 +1,4 @@
-// map.js — инициализация карт для index.html (десктоп и мобайл)
+// map.js — интеграция с бэкендом mapka API (использует createCardHTML из index.html если есть)
 ;(async function initMap() {
   const ymaps3 = window.ymaps3
   if (!ymaps3) {
@@ -16,7 +16,6 @@
   const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer, YMapMarker } = ymaps3
 
   const rostovLocation = { center: [39.711515, 47.236171], zoom: 12 }
-  const GEOCODE_API_KEY = "58c38b72-57f7-4946-bc13-a256d341281a"
 
   const desktopMapContainer = document.getElementById("map")
   const mobileMapContainer = document.getElementById("mobileMap")
@@ -41,8 +40,35 @@
     return
   }
 
+  // ====== Автоопределение API_BASE / API_ORIGIN (локально или через ngrok) ======
+  const API_BASE = (() => {
+    try {
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        return "http://localhost:8000/api"
+      }
+      return `${location.protocol}//${location.host}/api`
+    } catch (e) {
+      return "http://localhost:8000/api"
+    }
+  })()
+
+  const API_ORIGIN = (() => {
+    try {
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        return "http://localhost:8000"
+      }
+      return `${location.protocol}//${location.host}`
+    } catch (e) {
+      return "http://localhost:8000"
+    }
+  })()
+
+  console.log("map.js using API_BASE =", API_BASE, "API_ORIGIN =", API_ORIGIN)
+  // ==========================================================================
+
   async function geocodeAddress(address) {
     if (!address) return null
+    const GEOCODE_API_KEY = "58c38b72-57f7-4946-bc13-a256d341281a"
     const url = `https://geocode-maps.yandex.ru/1.x/?format=json&geocode=${encodeURIComponent(address)}&apikey=${GEOCODE_API_KEY}&results=1`
     try {
       const r = await fetch(url)
@@ -121,14 +147,12 @@
   function addMarkerToBothMaps(coords, title = "", rawAddress = "") {
     const normalizedAddr = normalizeAddress(rawAddress)
 
-    // Метка для десктопной карты
     if (desktopMap) {
       const desktopMarker = createMarkerElement(title, rawAddress)
       desktopMarker.addEventListener("click", () => scrollToCard(normalizedAddr, "desktopCards"))
       desktopMap.addChild(new YMapMarker({ coordinates: coords }, desktopMarker))
     }
 
-    // Метка для мобильной карты
     if (mobileMap) {
       const mobileMarker = createMarkerElement(title, rawAddress)
       mobileMarker.addEventListener("click", () => scrollToCard(normalizedAddr, "mobileCards"))
@@ -151,33 +175,106 @@
     }
   }
 
-  // Собираем адреса из карточек (используем только десктопные, т.к. данные одинаковые)
-  const els = Array.from(document.querySelectorAll("#desktopCards .cardLocationText"))
-  if (!els.length) {
-    console.warn("Не найдено .cardLocationText")
-    return
+  // load and render
+  async function loadAndRenderClubs() {
+    let clubs = []
+    try {
+      const res = await fetch(`${API_BASE}/clubs`)
+      if (!res.ok) throw new Error("HTTP " + res.status)
+      clubs = await res.json()
+    } catch (err) {
+      console.error("Не удалось загрузить клубы с API:", err)
+      const errNode = document.createElement("div")
+      errNode.style.padding = "12px"
+      errNode.style.color = "#900"
+      errNode.textContent = "Не удалось загрузить список кружков."
+      const container = document.getElementById("desktopCards")
+      if (container) container.appendChild(errNode)
+      return
+    }
+
+    // prepare objects exactly as frontend expects
+    const prepared = clubs.map((c) => {
+      // image normalization: prefer 'image' if provided by API, else main_image_url / images[0]
+      let img = c.image || c.main_image_url || (c.images && c.images[0] && c.images[0].url) || ""
+      // if relative path (starts with '/'), prefix API_ORIGIN so URL becomes absolute
+      if (img && img.startsWith("/")) img = API_ORIGIN.replace(/\/$/, "") + img
+
+      // tags fallback
+      const tags = c.tags || []
+
+      return {
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        image: img,
+        location:
+          c.location ||
+          c.address_text ||
+          (c.address && (c.address.street ? c.address.street : "") + (c.address.city ? ", " + c.address.city : "")) ||
+          "",
+        isFavorite: !!c.isFavorite,
+        tags: tags,
+        lat: c.lat || null,
+        lon: c.lon || null,
+        price_cents: c.price_cents || null,
+      }
+    })
+
+    // render using page's createCardHTML
+    const desktopContainer = document.getElementById("desktopCards")
+    const mobileContainer = document.getElementById("mobileCards")
+    try {
+      if (desktopContainer) desktopContainer.innerHTML = prepared.map((club) => window.createCardHTML(club)).join("")
+      if (mobileContainer) mobileContainer.innerHTML = prepared.map((club) => window.createCardHTML(club)).join("")
+    } catch (e) {
+      console.error("Rendering error:", e)
+    }
+
+    if (typeof window.initFilters === "function") {
+      window.initFilters(prepared)
+    }
+
+    // add markers — use coords when present, otherwise geocode address
+    const added = []
+    for (const club of prepared) {
+      let coords = null
+      if (club.lat !== null && club.lon !== null) {
+        coords = [club.lon, club.lat] // [lng, lat]
+      } else if (club.location) {
+        coords = await geocodeAddress(club.location)
+      }
+      if (coords) {
+        addMarkerToBothMaps(coords, club.name, club.location)
+        added.push(coords)
+      }
+      // throttle geocode requests (avoid rate limits)
+      await new Promise((r) => setTimeout(r, 200))
+    }
+
+    // center maps on first marker
+    if (added.length) {
+      const centerLocation = { center: added[0], zoom: 13 }
+      if (desktopMap && typeof desktopMap.setLocation === "function") {
+        desktopMap.setLocation(centerLocation)
+      }
+      if (mobileMap && typeof mobileMap.setLocation === "function") {
+        mobileMap.setLocation(centerLocation)
+      }
+    }
   }
 
-  const added = []
-  for (const el of els) {
-    const raw = el.textContent.trim()
-    const title = el.closest(".sectionCard")?.querySelector("h2")?.textContent?.trim() || ""
-    const coords = await geocodeAddress(raw)
-    if (coords) {
-      addMarkerToBothMaps(coords, title, raw)
-      added.push(coords)
-    }
-    await new Promise((r) => setTimeout(r, 200))
-  }
+  // run
+  await loadAndRenderClubs()
 
-  // Центрируем карты на первой метке
-  if (added.length) {
-    const centerLocation = { center: added[0], zoom: 13 }
-    if (desktopMap && typeof desktopMap.setLocation === "function") {
-      desktopMap.setLocation(centerLocation)
-    }
-    if (mobileMap && typeof mobileMap.setLocation === "function") {
-      mobileMap.setLocation(centerLocation)
-    }
-  }
+  // delegate click: scroll to card by address when marker/card clicked
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest(".sectionCard")
+    if (!card) return
+    const addrNode = card.querySelector(".cardLocationText")
+    if (!addrNode) return
+    const norm = normalizeAddress(addrNode.textContent)
+    scrollToCard(norm, "desktopCards")
+  })
 })()
