@@ -236,12 +236,13 @@
       right: -24px;
       top: 50%;
       transform: translateY(-50%);
-      width: 24px;
-      height: 80px;
+      /* made the button circular instead of rounded rectangle */
+      width: 48px;
+      height: 48px;
       background: var(--bg-secondary);
       border: 2px solid #1a1a1a;
       border-left: none;
-      border-radius: 0 12px 12px 0;
+      border-radius: 0 50% 50% 0;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -1344,48 +1345,64 @@
     window.createCardHTML = createCardHTML;
 
     function initFilters(clubsData) {
+      console.log("[v0] initFilters called with", clubsData.length, "clubs");
       allClubs = clubsData;
       
       const tagSet = new Set();
       let maxPrice = 0;
       
       clubsData.forEach(club => {
-        (club.tags || []).forEach(tag => tagSet.add(tag.toLowerCase()));
+        const clubTags = club.tags || [];
+        console.log("[v0] Club", club.name, "tags:", clubTags);
+        clubTags.forEach(tag => {
+          if (tag) tagSet.add(tag.toLowerCase());
+        });
         const priceCents = club.price_cents || 0;
         const priceRub = Math.round(priceCents / 100);
         if (priceRub > maxPrice) maxPrice = priceRub;
       });
       
       allTags = Array.from(tagSet).sort();
+      console.log("[v0] All tags loaded from backend:", allTags);
       maxPriceFromDB = maxPrice > 0 ? maxPrice : 5000;
       
       const priceSlider = document.getElementById('priceSlider');
       const maxPriceLabel = document.getElementById('maxPriceLabel');
       const currentPriceValue = document.getElementById('currentPriceValue');
       
-      priceSlider.max = maxPriceFromDB;
-      priceSlider.value = maxPriceFromDB;
-      filterState.maxPrice = maxPriceFromDB;
-      maxPriceLabel.textContent = `${maxPriceFromDB.toLocaleString('ru-RU')} ₽`;
-      currentPriceValue.textContent = maxPriceFromDB.toLocaleString('ru-RU');
-      updateSliderBackground(priceSlider);
+      if (priceSlider && maxPriceLabel && currentPriceValue) {
+        priceSlider.max = maxPriceFromDB;
+        priceSlider.value = maxPriceFromDB;
+        filterState.maxPrice = maxPriceFromDB;
+        maxPriceLabel.textContent = `${maxPriceFromDB.toLocaleString('ru-RU')} ₽`;
+        currentPriceValue.textContent = maxPriceFromDB.toLocaleString('ru-RU');
+        updateSliderBackground(priceSlider);
+      }
       
       renderFilterTags();
     }
 
     function renderFilterTags() {
       const filterTagsContainer = document.getElementById('filterTags');
+      if (!filterTagsContainer) {
+        console.warn("[v0] filterTags container not found");
+        return;
+      }
+      
+      console.log("[v0] Rendering", allTags.length, "filter tags");
       filterTagsContainer.innerHTML = allTags.map(tag => 
         `<button class="filter-tag ${filterState.selectedTags.includes(tag) ? 'active' : ''}" data-tag="${tag}">${tag}</button>`
       ).join('');
       
       // Show/hide expand button based on tag count
       const expandBtn = document.getElementById('tagsExpandBtn');
-      if (allTags.length > 4) {
-        expandBtn.style.display = 'flex';
-      } else {
-        expandBtn.style.display = 'none';
-        filterTagsContainer.classList.add('expanded');
+      if (expandBtn) {
+        if (allTags.length > 4) {
+          expandBtn.style.display = 'flex';
+        } else {
+          expandBtn.style.display = 'none';
+          filterTagsContainer.classList.add('expanded');
+        }
       }
     }
 
