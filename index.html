@@ -1949,6 +1949,20 @@ function applyFilters() {
         console.log("Mobile map initialization placeholder.");
       }
     });
+      function handleLiveSearch(value) {
+  filterState.searchQuery = value.trim();
+  applyFilters();
+}
+
+// Desktop — поиск при вводе
+document.getElementById('desktopSearchInput')?.addEventListener('input', (e) => {
+  handleLiveSearch(e.target.value);
+});
+
+// Mobile — поиск при вводе
+document.getElementById('mobileSearchInput')?.addEventListener('input', (e) => {
+  handleLiveSearch(e.target.value);
+});
 
   </script>
 </body>
