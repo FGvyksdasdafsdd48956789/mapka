@@ -1562,30 +1562,25 @@
     }
 
     (async function initPage() {
-      // Show loading state
-      const desktopCards = document.getElementById('desktopCards');
-      const mobileCards = document.getElementById('mobileCards');
-      
-      if (desktopCards) desktopCards.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Загрузка кружков...</div>';
-      if (mobileCards) mobileCards.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Загрузка кружков...</div>';
-      
-      // Load data from API
-      const clubs = await loadClubsFromAPI();
-      
-      if (clubs.length === 0) {
-        const emptyMsg = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Кружки не найдены или ошибка загрузки</div>';
-        if (desktopCards) desktopCards.innerHTML = emptyMsg;
-        if (mobileCards) mobileCards.innerHTML = emptyMsg;
-        return;
-      }
-      
-      // Render cards
-      if (desktopCards) desktopCards.innerHTML = clubs.map(createCardHTML).join('');
-      if (mobileCards) mobileCards.innerHTML = clubs.map(createCardHTML).join('');
-      
-      // Initialize filters with actual data from API
-      initFilters(clubs);
-    })();
+  const cardsContainers = ['desktopCards', 'mobileCards'].map(id => 
+    document.getElementById(id)
+  );
+  
+  cardsContainers.forEach(container => {
+    if (container) container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Загрузка кружков...</div>';
+  });
+  
+  try {
+    const clubs = await fetchClubs(); // ЕДИНЫЙ источник данных
+    initFilters(clubs);
+    renderCards(clubs);
+  } catch (error) {
+    console.error('Ошибка загрузки:', error);
+    cardsContainers.forEach(container => {
+      if (container) container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Ошибка загрузки данных</div>';
+    });
+  }
+})();
 
     // Mobile menu toggle
     const menuBtn = document.getElementById('menuBtn');
@@ -1697,21 +1692,23 @@
     });
 
     document.getElementById('filterTags')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.filter-tag');
-      if (!btn) return;
+  const btn = e.target.closest('.filter-tag');
+  if (!btn) return;
 
-      const tag = btn.dataset.tag;
-      btn.classList.toggle('active');
+  const tag = btn.dataset.tag; // ОРИГИНАЛЬНЫЙ регистр
+  console.log('Выбран тег:', tag); // DEBUG
+  
+  btn.classList.toggle('active');
 
-      if (btn.classList.contains('active')) {
-        if (!filterState.selectedTags.includes(tag)) {
-          filterState.selectedTags.push(tag);
-        }
-      } else {
-        filterState.selectedTags = filterState.selectedTags.filter(t => t !== tag);
-      }
-      applyFilters(); // Apply filters immediately when tags are clicked
-    });
+  if (btn.classList.contains('active')) {
+    if (!filterState.selectedTags.includes(tag)) {
+      filterState.selectedTags.push(tag);
+    }
+  } else {
+    filterState.selectedTags = filterState.selectedTags.filter(t => t !== tag);
+  }
+  applyFilters();
+});
 
     const priceSlider = document.getElementById('priceSlider');
     const currentPriceValue = document.getElementById('currentPriceValue');
