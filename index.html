@@ -1447,21 +1447,26 @@
     }
 
     function applyFilters() {
-      const searchQuery = filterState.searchQuery.toLowerCase();
-      const selectedTags = filterState.selectedTags;
-      const maxPriceRub = filterState.maxPrice;
+  const searchQuery = filterState.searchQuery.toLowerCase();
+  const selectedTags = filterState.selectedTags;
+  const maxPriceRub = filterState.maxPrice;
 
-      // Fetch filtered clubs from API
-      fetchClubs(searchQuery, selectedTags, maxPriceRub)
-        .then(filteredClubs => {
-          renderCards(filteredClubs);
-          updateActiveFiltersDisplay();
-        })
-        .catch(error => {
-          console.error("Error applying filters:", error);
-          renderCards([]); // Clear cards if error
-        });
-    }
+  fetchClubs(searchQuery, selectedTags, maxPriceRub)
+    .then(filteredClubs => {
+      // 1. обновляем глобальное состояние
+      allClubs = filteredClubs;
+
+      // 2. рендерим карточки из актуального массива
+      renderCards(allClubs);
+
+      updateActiveFiltersDisplay();
+    })
+    .catch(error => {
+      console.error("Error applying filters:", error);
+      allClubs = [];
+      renderCards([]);
+    });
+}
 
     function updateActiveFiltersDisplay() {
       ['desktopActiveFilters', 'mobileActiveFilters'].forEach(containerId => {
@@ -1566,15 +1571,22 @@
   const cardsContainers = ['desktopCards', 'mobileCards'].map(id => 
     document.getElementById(id)
   );
-  
+
   cardsContainers.forEach(container => {
     if (container) container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Загрузка кружков...</div>';
   });
-  
+
   try {
-    const clubs = await fetchClubs(); // ЕДИНЫЙ источник данных
-    initFilters(clubs);
-    renderCards(clubs);
+    const clubs = await fetchClubs(); // единый источник данных
+
+    // 1. сохраняем полный список
+    allClubs = clubs;
+
+    // 2. инициализация фильтров
+    initFilters(allClubs);
+
+    // 3. рендер из allClubs
+    renderCards(allClubs);
   } catch (error) {
     console.error('Ошибка загрузки:', error);
     cardsContainers.forEach(container => {
