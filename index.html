@@ -1327,7 +1327,7 @@
       if (priceCents === null || priceCents === undefined || priceCents === 0) {
         return { text: 'Бесплатно', isFree: true };
       }
-      const priceRub = Math.round(priceCents / 100);
+      const priceRub = Math.round(priceCents / 1);
       return { text: `${priceRub.toLocaleString('ru-RU')} ₽`, isFree: false };
     }
 
@@ -1855,7 +1855,6 @@
       desktopPanelHandle.style.transition = 'transform 0.3s ease'; // Add transition to handle itself
     });
 
-    // Drag to toggle on desktop
     let desktopDragStartX = 0;
     let isDesktopDragging = false;
 
@@ -1866,6 +1865,7 @@
       leftPanel.style.transition = 'transform 0s'; // Disable transition during drag
     });
 
+    //drag to toggle
     document.addEventListener('mousemove', (e) => {
       if (!isDesktopDragging) return;
       const deltaX = e.clientX - desktopDragStartX;
@@ -1891,6 +1891,8 @@
         leftPanel.style.transition = 'transform 0.3s ease'; // Re-enable transition
       }
     });
+
+    
 
     // Initialize map (placeholder, actual map logic would be here)
     function initializeMap() {
