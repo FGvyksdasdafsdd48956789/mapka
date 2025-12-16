@@ -1,0 +1,32 @@
+<!-- admin/login/index.html -->
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Login</title></head>
+<body>
+  <h2>Вход</h2>
+  <form id="f">
+    <input name="username" placeholder="Логин" required><br>
+    <input name="password" type="password" placeholder="Пароль" required><br>
+    <button>Войти</button>
+  </form>
+<script>
+document.getElementById('f').addEventListener('submit', async (e)=> {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+
+  const res = await fetch('/admin/login', {
+    method: 'POST',
+    body: new URLSearchParams(fd),
+    credentials: 'include',
+  });
+
+  if (res.ok) {
+    // Раз логин прошёл, идём в админку
+    window.location.href = "/admin.html";
+  } else {
+    alert('Ошибка входа');
+  }
+});
+</script>
+</body>
+</html>
