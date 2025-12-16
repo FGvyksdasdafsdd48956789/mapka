@@ -1446,26 +1446,38 @@
       slider.style.setProperty('--slider-percent', percent + '%');
     }
 
-    function applyFilters() {
-  const searchQuery = filterState.searchQuery.toLowerCase();
-  const selectedTags = filterState.selectedTags;
-  const maxPriceRub = filterState.maxPrice;
+       // ПОЛНЫЙ список (меняется ТОЛЬКО при первой загрузке)
+let filteredClubs = [];  // ОТОБРАЖАЕМЫЙ список
 
-  fetchClubs(searchQuery, selectedTags, maxPriceRub)
-    .then(filteredClubs => {
-      // 1. обновляем глобальное состояние
-      allClubs = filteredClubs;
+function applyFilters() {
+  const query = filterState.searchQuery.toLowerCase();
+  const tags = filterState.selectedTags;
+  const maxPrice = filterState.maxPrice * 100;
 
-      // 2. рендерим карточки из актуального массива
-      renderCards(allClubs);
+  const result = allClubs.filter(club => {
+    // поиск
+    if (query && !club.name.toLowerCase().includes(query)) {
+      return false;
+    }
 
-      updateActiveFiltersDisplay();
-    })
-    .catch(error => {
-      console.error("Error applying filters:", error);
-      allClubs = [];
-      renderCards([]);
-    });
+    // цена
+    if (club.price_cents && club.price_cents > maxPrice) {
+      return false;
+    }
+
+    // теги
+    if (tags.length > 0) {
+      const clubTags = (club.tags || []).map(t => t.toLowerCase());
+      if (!tags.every(t => clubTags.includes(t))) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  renderCards(result);
+  updateActiveFiltersDisplay();
 }
 
     function updateActiveFiltersDisplay() {
@@ -1567,30 +1579,30 @@
       }
     }
 
-    (async function initPage() {
-  const cardsContainers = ['desktopCards', 'mobileCards'].map(id => 
-    document.getElementById(id)
-  );
+   (async function initPage() {
+  const containers = ['desktopCards', 'mobileCards']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
 
-  cardsContainers.forEach(container => {
-    if (container) container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Загрузка кружков...</div>';
+  containers.forEach(c => {
+    c.innerHTML = '<div style="padding:20px;text-align:center;">Загрузка кружков...</div>';
   });
 
   try {
-    const clubs = await fetchClubs(); // единый источник данных
+    // 1. Загружаем ПОЛНЫЙ список один раз
+    allClubs = await fetchClubs();
 
-    // 1. сохраняем полный список
-    allClubs = clubs;
-
-    // 2. инициализация фильтров
+    // 2. Инициализация фильтров только по полному списку
     initFilters(allClubs);
 
-    // 3. рендер из allClubs
-    renderCards(allClubs);
-  } catch (error) {
-    console.error('Ошибка загрузки:', error);
-    cardsContainers.forEach(container => {
-      if (container) container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Ошибка загрузки данных</div>';
+    // 3. Первый рендер — всё
+    filteredClubs = [...allClubs];
+    renderCards(filteredClubs);
+
+  } catch (e) {
+    console.error(e);
+    containers.forEach(c => {
+      c.innerHTML = '<div style="padding:20px;text-align:center;">Ошибка загрузки</div>';
     });
   }
 })();
@@ -1849,10 +1861,10 @@
         const id = btn.dataset.id;
         // In a real app, you would update this state on the server via API
         const clubIndex = allClubs.findIndex(c => c.id == id);
-        if (clubIndex !== -1) {
+          if (clubIndex !== -1) {
             allClubs[clubIndex].isFavorite = !allClubs[clubIndex].isFavorite;
+          }
         }
-      }
     });
 
     const leftPanel = document.getElementById('leftPanel');
